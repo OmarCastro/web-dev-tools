@@ -1,14 +1,16 @@
 
-import { assertEquals } from "https://deno.land/std@0.172.0/testing/asserts.ts";
+// @ts-ignore
+import { test, assertEquals } from "../../../test-utils/unit-test-api.ts";
+// @ts-ignore
 import { getLanguageFromElement } from "../get-lang-from-element.util.ts"
+// @ts-ignore
 import { document } from "../../../test-utils/init-dom.ts"
-console.log(document)
 
 const html = String.raw
 
 
 
-Deno.test("getLanguageFromElement should get correctly defined lang value", () => {
+test("getLanguageFromElement should get correctly defined lang value", () => {
     document.body.innerHTML = html`
         <div class="level-1" lang="pt">
             <div class="level-2">
@@ -31,7 +33,7 @@ Deno.test("getLanguageFromElement should get correctly defined lang value", () =
     assertEquals(getLanguageFromElement(level4Div), "en-US")  
 })
 
-Deno.test("getLanguageFromElement should ignore incorrectly defined html lang value", () => {
+test("getLanguageFromElement should ignore incorrectly defined html lang value", () => {
     document.body.innerHTML = html`
         <div class="level-1" lang="pt">
             <div class="level-2">
@@ -54,7 +56,41 @@ Deno.test("getLanguageFromElement should ignore incorrectly defined html lang va
     assertEquals(getLanguageFromElement(level4Div), "pt")  
 })
 
-Deno.test("getLanguageFromElement should get lang value on element inside shadow DOM", () => {
+test("getLanguageFromElement return navigation.language on undefined lang", () => {
+    // prepare
+    document.body.innerHTML = html`<div class="level-1"></div>`;
+    const navigatorLanguage = navigator.language
+    const level1Div = document.querySelector(".level-1") as Element
+    document.documentElement.removeAttribute("lang")
+
+    //act
+    const level1DivLang = getLanguageFromElement(level1Div)
+
+    //assert
+    assertEquals(level1DivLang, navigatorLanguage)
+
+    // clean
+    document.documentElement.setAttribute("lang", "en")
+})
+
+test("getLanguageFromElement return navigation.language on invalid <html> lang", () => {
+    // prepare
+    document.body.innerHTML = html`<div class="level-1"></div>`;
+    const navigatorLanguage = navigator.language
+    const level1Div = document.querySelector(".level-1") as Element
+    document.documentElement.setAttribute("lang", "yayay!!")
+
+    // act
+    const level1DivLang = getLanguageFromElement(level1Div)
+
+    // clean
+    document.documentElement.setAttribute("lang", "en")
+
+    // assert
+    assertEquals(level1DivLang, navigatorLanguage)
+})
+
+test("getLanguageFromElement should get lang value on element inside shadow DOM", () => {
     document.body.innerHTML = html`
         <div class="level-1" lang="pt">
             <div class="level-2">
@@ -90,7 +126,7 @@ Deno.test("getLanguageFromElement should get lang value on element inside shadow
     assertEquals(getLanguageFromElement(shadowLevel2Div), "pt")  
 })
 
-Deno.test("getLanguageFromElement should get lang from shadow DOM, if defined, on slotted element", () => {
+test("getLanguageFromElement should get lang from shadow DOM, if defined, on slotted element", () => {
     document.body.innerHTML = html`
         <div class="level-1" lang="pt">
             <div class="level-2">
