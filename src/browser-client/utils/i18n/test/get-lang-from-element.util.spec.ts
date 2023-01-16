@@ -160,3 +160,44 @@ test("getLanguageFromElement should get lang from shadow DOM, if defined, on slo
     assertEquals(getLanguageFromElement(level4Div), "pt-PT")  
 })
 
+test("getLanguageFromElement should ignore invalid lang from shadow DOM, if defined, on slotted element", () => {
+    // prepare
+    document.body.innerHTML = html`
+        <div class="level-1" lang="pt">
+            <div class="level-2">
+                <div class="level-3">
+                    <div class="level-4"></div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    const level2ShadowDomHtml = html`
+    <div class="shadow-level-1" lang="yayayayaa!!">
+        <div class="shadow-level-2">
+            <slot></slot>
+        </div>
+    </div>
+`;
+
+
+    const level1Div = document.querySelector(".level-1") as Element
+    const level2Div = document.querySelector(".level-2") as Element
+    const shadowRoot = level2Div.attachShadow({mode: "open"})
+    shadowRoot.innerHTML = level2ShadowDomHtml
+
+    const level3Div = document.querySelector(".level-3") as Element
+    const level4Div = document.querySelector(".level-4") as Element
+
+    // act
+    const level1DivLang = getLanguageFromElement(level1Div)
+    const level2DivLang = getLanguageFromElement(level2Div)
+    const level3DivLang = getLanguageFromElement(level3Div)
+    const level4DivLang = getLanguageFromElement(level4Div)
+
+    //assert
+    assertEquals(getLanguageFromElement(level1Div), "pt")
+    assertEquals(getLanguageFromElement(level2Div), "pt")
+    assertEquals(getLanguageFromElement(level3Div), "pt")
+    assertEquals(getLanguageFromElement(level4Div), "pt")  
+})
