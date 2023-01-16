@@ -1,8 +1,9 @@
-import { closestElement } from "../algorithms/closest-bypassing-shadow-dom";
+// @ts-ignore
+import { closestElement } from "../algorithms/closest-bypassing-shadow-dom.ts";
 
 function handleInvalidLanguage(elementWithLangAttr: Element, invalidLanguage: string): string{
     console.error(`invalid language "${invalidLanguage}" ignoring lang`)
-    if(elementWithLangAttr === document.documentElement){
+    if(elementWithLangAttr === elementWithLangAttr.ownerDocument.documentElement){
         return navigator.language
     } else if(elementWithLangAttr.parentNode instanceof ShadowRoot){
         return getLanguageFromElement(elementWithLangAttr.parentNode.host)
@@ -11,7 +12,7 @@ function handleInvalidLanguage(elementWithLangAttr: Element, invalidLanguage: st
 }
 
 export function getLanguageFromElement(element: Element): string {
-    const elementWithLangAttr = closestElement("[lang]", element);
+    const elementWithLangAttr = closestElement("[lang]", element, {navigateSlots: true});
     if(elementWithLangAttr == null){
         return navigator.language
     }
