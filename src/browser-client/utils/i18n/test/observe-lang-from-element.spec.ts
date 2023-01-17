@@ -77,36 +77,3 @@ test("observeLangFromElement should trigger correctly when lang changed in the m
     assertEquals(level4DivLang, "pt")  
     assertEquals(level4DivNewLang, "es")  
 })
-
-test("observeLangFromElement should trigger correctly when lang changed in the middle of the ascension tree", async () => {
-    // prepare
-    document.body.innerHTML = html`
-        <div class="level-1" lang="pt">
-            <div class="level-2">
-                <div class="level-3">
-                    <div class="level-4"></div>
-                </div>
-            </div>
-        </div>
-    `;
-
-
-    const level3Div = document.querySelector(".level-3") as Element
-    const level4Div = document.querySelector(".level-4") as Element
-
-    // act
-    observeLangFromElement(level4Div);
-
-
-    const level4DivLang = getLanguageFromElement(level4Div)
-    await new Promise<void>((resolve) => {
-        level4Div.addEventListener(eventName, () => { resolve(); },{once: true})
-        level3Div.setAttribute("lang", "es")
-    })
-    const level4DivNewLang = getLanguageFromElement(level4Div)
-    unobserveLangFromElement(level4Div)
-
-    // assert
-    assertEquals(level4DivLang, "pt")  
-    assertEquals(level4DivNewLang, "es")  
-})
