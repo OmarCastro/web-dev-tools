@@ -71,6 +71,57 @@ test("observeLangFromElement should trigger another event on node root", async (
     assertEquals(level4DivNewLang, "es") 
 })
 
+
+test("observeLangFromElement should trigger multiple observing elements when ancestor lang changed", async () => {
+    // prepare
+    document.body.innerHTML = html`
+        <div class="level-1" lang="pt">
+            <div class="level-2">
+                <div class="level-3">
+                    <div class="level-4">
+                        <div class="level-5"></div>
+                        <div class="level-5-2"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    const level3Div = document.querySelector(".level-3") as Element
+    const level4Div = document.querySelector(".level-4") as Element
+    const level5Div = document.querySelector(".level-5") as Element
+    const level5_2Div = document.querySelector(".level-5-2") as Element
+    const level3Event = { triggered: false }
+    const level4Event = { triggered: false }
+    const level5Event = { triggered: false }
+    const level5_2Event = { triggered: false }
+
+    // act
+    observeLangFromElement(level3Div);
+    observeLangFromElement(level5Div);
+    observeLangFromElement(level5_2Div);
+
+    level3Div.addEventListener(eventName, () => { level3Event.triggered = true; },{once: true})
+    level4Div.addEventListener(eventName, () => { level4Event.triggered = true; },{once: true})
+    level5Div.addEventListener(eventName, () => { level5Event.triggered = true; },{once: true})
+    level5_2Div.addEventListener(eventName, () => { level5_2Event.triggered = true; },{once: true})
+
+    await new Promise<void>((resolve) => {
+        document.addEventListener(rootEventName, () => { resolve(); },{once: true})
+        level3Div.setAttribute("lang", "es")
+    })
+
+    unobserveLangFromElement(level3Div)
+    unobserveLangFromElement(level5Div)
+    unobserveLangFromElement(level5_2Div)
+
+    // assert
+    assert(level3Event.triggered)
+    assertFalse(level4Event.triggered)
+    assert(level5Event.triggered)
+    assert(level5_2Event.triggered)
+})
+
 test("observeLangFromElement should trigger when lang changed in the middle of the ascension tree", async () => {
     // prepare
     document.body.innerHTML = html`
