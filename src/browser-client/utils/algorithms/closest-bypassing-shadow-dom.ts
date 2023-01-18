@@ -1,17 +1,32 @@
 
-
-
-function closestFrom(el: Node | Window | Document, selector: string, ownerDocument: Document, window: Window): Element {
-    if (!el || el === ownerDocument || el === window){
-      return null;
+/**
+ * 
+ *   Get closest element by passing shadow DOM, the Element.closest() validates
+ * until the root node in the DOM. The use-cases for this are few, such as
+ * getting environment information about the component
+ */
+export function closestElement(selector: string, base: Element = this) {
+    const { ownerDocument } = base;
+    let el: Node = base
+    while (el != null && el !== ownerDocument){
+        const element = (el as Element)
+        const found = element.closest(selector);
+        if(found){
+            return found
+        }
+        el = (element.getRootNode() as ShadowRoot).host
     } 
-    
-    let found = (el as Element).closest(selector);
-    return found ? found : closestFrom(((el as Element).getRootNode() as ShadowRoot).host, selector, ownerDocument, window);
+    return null
 }
 
-function closestFrom__navigatingSlots(el: Node, selector: string, ownerDocument: Document): Element {
-    
+/**
+ *   Get closest element by passing shadow DOM, the Element.closest() validates
+ * until the root node in the DOM. It is an adaptation of closestElement that
+ * allows to get information inside shadow DOM of components with slot in shadow DOM
+ */
+export function closestElementNavigatingSlots(selector: string, base: Element = this) {
+    const { ownerDocument } = base;
+    let el: Node = base
     while (el != null && el !== ownerDocument){
         const element = (el as Element)
         if(element.matches(selector)){
@@ -30,9 +45,3 @@ function closestFrom__navigatingSlots(el: Node, selector: string, ownerDocument:
     }
     return null;
 }
-
-
-export function closestElement(selector: string, base: Element = this, {navigateSlots = false} = {}) {
-    const { ownerDocument } = base;
-    return navigateSlots ? closestFrom__navigatingSlots(base, selector, ownerDocument) : closestFrom(base, selector, ownerDocument, ownerDocument.defaultView)
-  }
