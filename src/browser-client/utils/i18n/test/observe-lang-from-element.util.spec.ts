@@ -184,3 +184,46 @@ test("observeLangFromElement should not trigger event when a new lang was added 
     assertFalse(level4DivLangEvent.triggered)
     assertEquals(level4DivNewLang, "pt")  
 })
+
+
+test("observeLangFromElement should trigger on shadowDom element when lang changed on lightdom", async () => {
+    // prepare
+    document.body.innerHTML = html`
+        <div class="level-1" lang="pt">
+            <div class="level-2">
+                <div class="level-3">
+                    <div class="level-4"></div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    const level2ShadowDomHtml = html`
+        <div class="shadow-level-1">
+            <div class="shadow-level-2">
+                <slot></slot>
+            </div>
+        </div>
+    `;
+
+    const level1Div = document.querySelector(".level-1") as Element
+    const level2Div = document.querySelector(".level-2") as Element
+    const level4Div = document.querySelector(".level-4") as Element
+    const shadowRoot = level2Div.attachShadow({mode: "open"})
+    shadowRoot.innerHTML = level2ShadowDomHtml
+    const shadowLevel2Div = shadowRoot.querySelector(".shadow-level-2") as Element
+
+    // act
+    observeLangFromElement(shadowLevel2Div);
+    const shadowLevel2DivLang = getLanguageFromElement(shadowLevel2Div)
+    await new Promise<void>((resolve) => {
+        shadowLevel2Div.addEventListener(eventName, () => { resolve(); },{once: true})
+        level1Div.setAttribute("lang", "es")
+    })
+    const shadowLevel2DivNewLang = getLanguageFromElement(shadowLevel2Div)
+    unobserveLangFromElement(shadowLevel2Div)
+
+    // assert
+    assertEquals(shadowLevel2DivLang, "pt")  
+    assertEquals(shadowLevel2DivNewLang, "es")  
+})
