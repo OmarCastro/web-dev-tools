@@ -1,4 +1,6 @@
-// @deno-types="npm:@types/jsdom"
+// @ts-nocheck Since this file adds info to globalThis as to simulate a browser
+// on a Deno environment, it is better to disable type checking and code coverage
+// for this file
 let windowObj: Window;
 
 if("Deno" in globalThis){
@@ -27,7 +29,8 @@ if("Deno" in globalThis){
   globalThis.requestIdleCallback = windowObj.requestIdleCallback
   globalThis.cancelIdleCallback = windowObj.cancelIdleCallback
   globalThis.ShadowRoot = windowObj.ShadowRoot
-
+  globalThis.MutationObserver = windowObj.MutationObserver
+  globalThis.CustomEvent = windowObj.CustomEvent
 } else {
   windowObj = globalThis.window 
 }
