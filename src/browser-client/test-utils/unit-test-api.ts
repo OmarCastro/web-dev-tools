@@ -23,5 +23,5 @@ if("Deno" in globalThis){
   }
   
   export const test = testMethod 
-  export { assertEquals } from "https://deno.land/std@0.172.0/testing/asserts.ts"
+  export { assertEquals, assert, assertFalse } from "https://deno.land/std@0.172.0/testing/asserts.ts"
   
