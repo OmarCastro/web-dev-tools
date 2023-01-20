@@ -4,7 +4,7 @@ import { httpImports } from "https://deno.land/x/esbuild_plugin_http_imports@v1.
 
 const projectPath = new URL('../../',import.meta.url).pathname;
 
-async function writeJson(filePath:string, o:any) {
+async function writeJson(filePath:string, o:unknown) {
     try {
         await Deno.writeTextFile(filePath, JSON.stringify(o, null, 2));
     } catch(e) {
