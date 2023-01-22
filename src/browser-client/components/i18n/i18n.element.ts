@@ -1,31 +1,25 @@
+export default class I18nElement extends HTMLElement {
+    constructor(){
+        super()
+        setTimeout(() => {
+            this.attachShadow({mode: "open"})
+            this.shadowRoot.innerHTML = "aaaaa"    
+        }, 2000)
+    }
 
-const initiated = Symbol();
+    get key() {
+        return this.getAttribute("key")
+    }
+    
+    set key(key: string) {
+        this.setAttribute("key", key)
+    }
 
+    connectedCallback(){
+      console.log("AAAAHHH!!!")  
+    }
 
-const addProperty = (propertyName: string ,clazz: typeof HTMLElement) => {
-    Object.defineProperty(clazz.prototype, propertyName, {
-        get: function(this: HTMLElement) {
-            return this.getAttribute(propertyName)
-        },
-        
-        set: function(this: HTMLElement, key: string) {
-            this.setAttribute(propertyName, key)
-        }
-        
-    });
-
-}
-
-function extendClass(clazz: typeof HTMLElement){
-    addProperty("key", clazz)
-}
-
-
-export function apply<T extends HTMLElement>(instance: T, clazz: typeof HTMLElement){
-
-    if(!clazz.prototype[initiated]){
-        extendClass(clazz)
-        clazz.prototype[initiated] = true
-
+    disconnectedCallback(){
+        console.log("AAeeeeAAHHH!!!")  
     }
 }
