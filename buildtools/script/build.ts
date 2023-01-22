@@ -11,10 +11,53 @@ async function writeJson(filePath:string, o:unknown) {
         console.log(e);
     }
 }
+const decoder = new TextDecoder("utf-8");
+
+const importMetaPlugin : esbuild.Plugin = {
+    name: 'import.meta.url',
+    setup({ onLoad }) {
+      // TODO: change /()/ to smaller range
+      onLoad({ filter: /.*d.element.ts$/, namespace: 'file' }, args => {
+        
+        let code = decoder.decode(Deno.readFileSync(args.path))
+        if(args.suffix){
+            code = code.replace( /\bimport\.meta\.url\b/g,`(import.meta.url || "").replace(/[#\\?].*$/, '') + "${args.suffix}" `)
+        }
+        console.log(code)
+        return { contents: code }
+      })
+    }
+  }
 
 const target =  `${projectPath}/build`
+try {
+    await Deno.remove(target, {recursive: true});
+} catch {
+    /* ignore */
+}
 esbuild.build({
     entryPoints: [`${projectPath}/src/browser-client/entrypoint.ts`],
+    outdir: target,
+    format: "esm",
+    target: "es2022",
+    splitting: true,
+    bundle: true,
+    packages: "external",
+    plugins: [importMetaPlugin, httpImports()],
+    metafile: true,
+    loader: {
+        ".data.html": "copy",
+        ".page.html": "file",
+        ".page.css": "file",
+        ".html": "dataurl"
+    }
+  })
+  .then((result) => writeJson(`${target}/metadata.json`, result.metafile))
+  .then((() => console.log("⚡ Done")))
+  .then(() => Deno.exit(0))
+
+  esbuild.build({
+    entryPoints: [`${projectPath}/src/browser-client/components/i18n/i18n.element.ts`],
     outdir: target,
     format: "esm",
     target: "es2022",
@@ -32,5 +75,3 @@ esbuild.build({
   })
   .then((result) => writeJson(`${target}/metadata.json`, result.metafile))
   .then((() => console.log("⚡ Done")))
-  .then(() => Deno.exit(0))
-  
