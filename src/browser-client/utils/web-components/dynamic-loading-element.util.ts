@@ -1,143 +1,100 @@
-interface Loader{
-    clazz: typeof HTMLElement
-    assign: (clazz: typeof HTMLElement) => void
-    constructor: Function
-    constructingInstance?: HTMLElement | null
-}
-
-const connectedCallback = Symbol("connectedCallback")
-const disconnectedCallback = Symbol("disconnectedCallback")
-const adoptedCallback = Symbol("adoptedCallback")
-const attributeChangedCallback = Symbol("attributeChangedCallback")
-
-function initComponent(loader: Loader, component: typeof HTMLElement){
-
-    const loaded = Symbol();
-    const instanceOf = (element: HTMLElement) => element[loaded] ?  element : loader.constructingInstance
-
-    const newComponent = class extends component {
-        constructor(){
-            super()
-            const targetNode = loader.constructingInstance
-            this[loaded] = true
-            targetNode[loaded] = true
-            return targetNode
-        }
-
-        /* override attribute that can be used on constructors */ 
-
-        get dataset(){
-            return instanceOf(this).dataset
-        }
-
-        attachShadow(init: ShadowRootInit): ShadowRoot {
-            return instanceOf(this).attachShadow(init)
-        }
-        get shadowRoot(){
-            return instanceOf(this).shadowRoot
-        }
-        addEventListener<K extends keyof HTMLElementEventMap>(type: K, listener: (this: HTMLElement, ev: HTMLElementEventMap[K]) => any, options?: boolean | AddEventListenerOptions): void;
-        addEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions): void;
-        addEventListener(type: unknown, listener: unknown, options?: unknown): void {
-            return instanceOf(this).addEventListener(type as any,listener as any,options)
-        }
-        dispatchEvent(event: Event): boolean {
-            return instanceOf(this).dispatchEvent(event)
-        }
-        setAttribute(qualifiedName: string, value: string): void { 
-            return instanceOf(this).setAttribute(qualifiedName, value) 
-        }
-        getAttribute(qualifiedName: string): string {
-            return instanceOf(this).getAttribute(qualifiedName)
+const queryAllShadowHosts = (node: Node): Element[] => {
+    const result = []
+    const nodeIterator = document.createNodeIterator(node, Node.ELEMENT_NODE);
+    let currentNode;
+    while (currentNode = nodeIterator.nextNode()) {
+        if(currentNode.shadowRoot) {
+            result.push(currentNode)
         }
     }
-    loader.assign(newComponent)
+    return result
 }
 
-function assignLifecycleCallback(loader: Loader, clazz:typeof HTMLElement, symbol: symbol){
-    const proto = clazz.prototype as any
-    const loaderProto = loader.clazz.prototype as any
-    const callback = proto[symbol.description]
-    if(typeof callback === "function"){
-        loaderProto[symbol] = callback
-    } else {
-        console.warn(`expected connectedCallback() on class ${clazz} none defined`)
-        loaderProto[symbol] = () => {}
-    }
+const queryAllShadowHostsRecursive = (node: Node): Element[] => {
+    const result = []
+    const firstResult = queryAllShadowHosts(node)
+    result.push(...firstResult)
+    firstResult.forEach(node => result.push(...queryAllShadowHostsRecursive(node.shadowRoot)))
+    return result
 }
 
-function addConnectedCallback(loader: Loader){
-    let waitingElements = []
-    const newClass = class extends loader.clazz {
-        connectedCallback(){this[connectedCallback]()}
-        [connectedCallback](){ waitingElements.push(this) }
-    }
-    const oldAssign = loader.assign
-    loader.assign = (clazz) => {
-        oldAssign(clazz)
-        assignLifecycleCallback(loader, clazz, connectedCallback)
-        waitingElements.forEach(elem => elem[connectedCallback]())
-        waitingElements = []
-    }
-    loader.clazz = newClass
+const queryAllUndefinedElements = (node: Element|ShadowRoot) => node.querySelectorAll(":not(:defined)")
+
+interface RegistryData {
+    importCall: () => Promise<{default: typeof HTMLElement}>
+    status: "pending" | "registering" | "registered"
 }
 
-function addDisconnectedCallback(loader: Loader){
-    let waitingElements = []
-    const newClass = class extends loader.clazz {
-        disconnectedCallback(){this[disconnectedCallback]()}
-        [disconnectedCallback](){ waitingElements.push(this) }
+const registry = {
+    definedTagNames: new Set(),
+    registeringTagNames: new Set(),
+    registryMap: new Map<string, RegistryData>(),
+    get pendingTagNames(){
+        return Array.from(registry.registryMap.entries())
+            .filter(([_, value]) => value.status === "pending")
+            .map(([key]) => key)
+    },
+    get unregisteredTagNames() {
+        const tagNames = registry.registryMap.keys()
+        return Array.from(tagNames).filter(name => customElements.get(name) == null)
+    },
+    get tagNamesToRegister(){
+        const {unregisteredTagNames, registryMap, definedTagNames} = registry
+        return unregisteredTagNames.filter(name => definedTagNames.has(name) && registryMap.get(name).status === "pending")
+    },
+    registerElement: (name: string) => {
+        const registryData = registry.registryMap.get(name);
+        if(registryData?.status === "pending"){
+            registryData.importCall().then(module => customElements.define(name, module.default))
+        }
     }
-    const oldAssign = loader.assign
-    loader.assign = (clazz) => {
-        oldAssign(clazz)
-        assignLifecycleCallback(loader, clazz, disconnectedCallback)
-        waitingElements.forEach(elem => elem[disconnectedCallback]())
-        waitingElements = []
-    }
-    loader.clazz = newClass
 }
-
-export enum LifecycleCallbackEnum {
-    CONNECTED_CALLBACK=0b0001,
-    DISCONNECTED_CALLBACK=0b0010,
-    ADOPTED_CALLBACK=0b0100,
-    OBSERVE_ATTRIBUTES=0b1000,    
-}
-
-export function registerComponent(elementCodePath: string, importMetaUrl: string, options: LifecycleCallbackEnum, observedAttributes: string[] = [],defaultTag: string = undefined){
-    let waitingElements = []
-    const loader: Loader = {
-        clazz: class extends HTMLElement {
-            constructor(){
-                super()
-                loader.constructingInstance = this;
-                loader.constructor.call(this)
-            }
-        },
-        constructor: function() {
-            import(new URL(elementCodePath, importMetaUrl).toString()).then(module => initComponent(loader, module.default))
-            loader.constructor = function(){waitingElements.push(this)}
-            loader.constructor.call(this)
-        },
-        assign: (clazz) => {
-            customElements.define(customElementTag+crypto.randomUUID(), clazz)   
-            loader.constructor = () => new clazz()
-            waitingElements.forEach(elem => {
-                loader.constructingInstance = elem
-                loader.constructor()
+const tagNamesToIgnore = new Set("script link template".split(" "));
+const loopRegistryAnalysisFromNodes = (...nodes: Node[]) => {
+    nodes.forEach(node => {
+        if(node instanceof Element && !tagNamesToIgnore.has(node.tagName.toLowerCase())){
+            queryAllUndefinedElements(node).forEach(elem => registry.definedTagNames.add(elem.tagName.toLowerCase()))
+            const shadowHosts = queryAllShadowHostsRecursive(node).map(elem => elem.shadowRoot)
+            shadowHosts.forEach(elem => {
+                queryAllUndefinedElements(elem).forEach(elem => registry.definedTagNames.add(elem.tagName.toLowerCase()))
+                observer.observe(elem, observerParams)
             })
-            waitingElements = []
         }
+    })
+    registry.tagNamesToRegister.forEach(registry.registerElement)
+    if(registry.pendingTagNames.length <= 0){
+        observer.disconnect();
     }
+}
 
-
-    if(options & LifecycleCallbackEnum.CONNECTED_CALLBACK){ addConnectedCallback(loader) }
-    if(options & LifecycleCallbackEnum.DISCONNECTED_CALLBACK){ addDisconnectedCallback(loader) }
-
+const mutationCallback: MutationCallback = (records) => {
+    records.forEach((mutation) => {
+        if(mutation.type != "childList"){
+            return console.warn("reached unreachable code")
+        }
+        loopRegistryAnalysisFromNodes(...(mutation.addedNodes || []))
+    })
     
-    const url = new URL(importMetaUrl)
-    const elementName = url.searchParams.get('named')
-    const customElementTag = elementName || defaultTag
-    customElementTag && customElements.define(customElementTag, loader.clazz)   
+}
+const observerParams : MutationObserverInit = {
+    childList: true,
+    subtree: true
+}
+const observer = new MutationObserver(mutationCallback);
+
+
+let idleCallback = 0
+export function registerComponent(importCall: () => Promise<{default: typeof HTMLElement}>, tag: string){
+    const {registryMap} = registry;
+    if(registryMap.has(tag.toLowerCase())){
+        return console.error(`A custom element with name "${tag}" already exists`)
+    }
+    registryMap.set(tag, {importCall, status: "pending"})
+    observer.observe(document.body, observerParams);
+    if(!idleCallback){
+        idleCallback = requestIdleCallback(() => {
+            loopRegistryAnalysisFromNodes(document.body)
+            idleCallback = 0;
+        })
+    }
 }
